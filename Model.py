@@ -4,6 +4,9 @@ from DB_Controller import get_resume_by_id, get_vacancy_by_id, update_resume_by_
 from bson.objectid import ObjectId
 import re
 import requests
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 def extract_skills(text):
     """
@@ -28,19 +31,20 @@ def calculate_match_percentage(resume_skills, vacancy_skills):
     match_percentage = similarity_matrix[0][1] * 100
     return match_percentage
 
+@app.route('/upload_resume_and_calculate_match', methods=['POST'])
+def upload_resume_and_calculate_match():
+    data = request.json
+    user_id = data.get('user_id')
+    vacancy_id = data.get('vacancy_id')
+    resume_text = data.get('resume_text')
 
-def upload_resume_and_calculate_match(user_id, vacancy_id, resume_text):
-    """
-    Upload the resume text and calculate match percentage with the given vacancy_id.
-    """
     # Extract skills from the resume text
     resume_skills = extract_skills(resume_text)
 
     # Fetch the vacancy details
     response = requests.get(f"http://localhost:3000/api/vacancies/{vacancy_id}")
     if response.status_code != 200:
-        print("Vacancy not found or error in fetching vacancy details.")
-        return
+        return jsonify({"error": "Vacancy not found or error in fetching vacancy details."}), 400
 
     vacancy_data = response.json()
     vacancy_skills = vacancy_data.get("skills", "")
@@ -59,10 +63,11 @@ def upload_resume_and_calculate_match(user_id, vacancy_id, resume_text):
 
     update_response = requests.post(f"http://localhost:3000/api/upload-cv", json=resume_data)
     if update_response.status_code == 200:
-        print("Resume and match percentage uploaded successfully.")
+        return jsonify({"message": "Resume and match percentage uploaded successfully."}), 200
     else:
-        print("Failed to upload resume and match percentage.")
+        return jsonify({"error": "Failed to upload resume and match percentage."}), 500
 
+@app.route('/main/<resume_id>', methods=['GET'])
 def main(resume_id):
     # Fetch the resume data from the endpoint
     response = requests.get(f'https://api-android-c020.onrender.com/api/cv/{resume_id}')
@@ -91,13 +96,17 @@ def main(resume_id):
 
                         # Update the resume with the match percentage
                         update_resume_by_id(resume_id, {"matchPercentage": match_percentage})
+                        return jsonify({"matchPercentage": match_percentage}), 200
                     else:
-                        print("No connected vacancy found.")
+                        return jsonify({"error": "No connected vacancy found."}), 404
                 else:
-                    print("No vacatures_id found in the resume.")
+                    return jsonify({"error": "No vacatures_id found in the resume."}), 404
             else:
-                print("No resume found with the given ID.")
+                return jsonify({"error": "No resume found with the given ID."}), 404
         else:
-            print("No resume data found in the response.")
+            return jsonify({"error": "No resume data found in the response."}), 404
     else:
-        print(f"Failed to fetch resume data. Status code: {response.status_code}")
+        return jsonify({"error": f"Failed to fetch resume data. Status code: {response.status_code}"}), 500
+
+if __name__ == "__main__":
+    app.run()
