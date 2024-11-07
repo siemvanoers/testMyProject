@@ -1,4 +1,3 @@
-import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from DB_Controller import get_resume_by_id, get_vacancy_by_id, update_resume_by_id
